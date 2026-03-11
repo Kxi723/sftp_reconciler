@@ -4,6 +4,8 @@ Log/
 MissUpload/
 ShouldUpload/
 
+.env
+
 hi.txt
 test.txt
 abc.txt
