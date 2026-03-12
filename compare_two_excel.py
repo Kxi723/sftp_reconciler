@@ -1,7 +1,7 @@
-from pathlib import Path
-import logging
 from dotenv import load_dotenv
 import os
+from pathlib import Path
+import logging
 import pandas as pd
 from datetime import date, datetime
 from typing import Optional # can return as 'None'
@@ -24,8 +24,7 @@ logging.basicConfig(
 
 NEW_FILE = os.getenv("THE_LATEST_CSV_FILE_PATH")
 OLD_FILE = os.getenv("THE_SECOND_LATEST_CSV_FILE_PATH")
-
-
+INPUT_DIR = Path(os.getenv("CSV_FOLDER")) if os.getenv("CSV_FOLDER") else None
 
 
 class NewShipmentFinder:
@@ -34,39 +33,77 @@ class NewShipmentFinder:
     within a specific date window.
     """
 
+    # If no files found, use default file for presentation
     def __init__(self, new_file: str = NEW_FILE, old_file: str = OLD_FILE,
-                days_lookback: int = 31):
-        self.new_file = new_file
-        self.old_file = old_file
+                days_lookback: int = 31, dir_path: Path = INPUT_DIR):
+
+        self.first_file = new_file
+        self.second_file = old_file
         self.days_lookback = days_lookback
+        self.dir_path = dir_path
         self.ship_ref_col = "Ship Ref"
         self.pod_col = "POD"
 
 
-    def read_folder(self, dir_path:Path):
-        if not dir_path.exists() or not dir_path.is_dir():
-            print("wrong")
-            return
-        csv_files = list(dir_path.glob("*.csv"))
-        if not csv_files:
-            print("No .csv file found")
-            return
-        time_list= []
-        correct_path = ''
-        for i in csv_files:
-            with open(i, 'r', encoding='utf-8') as f:
-                timestamp = os.path.getmtime(i)
+    def read_and_find_files(self):
+        logging.debug(f"Reading directory {self.dir_path}")
+
+        # Ensure the path exists & is a directory
+        if not self.dir_path.exists() or not self.dir_path.is_dir():
+            raise FileNotFoundError("Directory not found")
+
+        csv_lists = list(self.dir_path.glob("*.csv"))
+        excel_lists = list(self.dir_path.glob("*.xlsx"))
+
+        # Nothing inside the directory
+        if not csv_lists and excel_lists:
+            raise FileNotFoundError("Didn't found any .csv & .xlsx files")
+        
+        # Prioritise for .csv files
+        elif csv_lists: 
+            logging.debug("Process A started to find two latest .csv files")
+
+            files_dict = {}
+            valid_files = 0
+
+            for file in csv_lists:
+                try:
+                    # Read only header row
+                    columns = pd.read_csv(file, nrows=0).columns
+                
+                    # Skip invalid .csv file
+                    if self.ship_ref_col not in columns or self.pod_col not in columns:
+                        logging.debug(f"File not considered {file}")
+                        continue
+                
+                    valid_files += 1
+
+                except Exception as e:
+                    logging.debug(f"File not considered {file}")
+                    continue
+
+                # Get file modification timestamp and convert to Datetime object
+                timestamp = os.path.getmtime(file)
                 datestamp = datetime.fromtimestamp(timestamp)
-                time_list.append(datestamp)
-                time_list.sort(reverse=True)
-                if time_list[0] == datestamp:
-                    correct_path = i
-        dataFrame = pd.read_csv(correct_path)
-        ShipRef_column = dataFrame.columns[9]
-        POD_column = dataFrame.columns[29]
 
-        ...
+                # Utilise setdefault() to ensure datestamp didnt overwrite
+                files_dict.setdefault(file.name, datestamp)
 
+            logging.debug(f"{valid_files} .csv files considered")
+
+            # Sort in descending order based on value(datestamp)
+            sorted_files = sorted(files_dict.items(), key=lambda item: item[1], reverse=True)
+            self.first_file = sorted_files[0][0]
+            self.second_file = sorted_files[1][0]
+
+            logging.info(f"Latest file found: {sorted_files[0][0]}")
+            logging.info(f"Second file found: {sorted_files[1][0]}")
+            logging.debug("Process A ended")
+
+        # No Function for .xlsx files
+        else:
+            logging.debug("Finding two latest .xlsx files")
+            raise SystemExit("This program currently doesn't support for .xlsx files")
 
 
     # '->' is for type hinting, indicating the return type of the function
@@ -145,13 +182,16 @@ class NewShipmentFinder:
             pod_str = pod_val.date() if pd.notnull(pod_val) else "Invalid Date"
             print(f"{idx:<6} {row[self.ship_ref_col]:<20} {pod_str}")
 
+
+
 if __name__ == "__main__":
 
     logging.info("Program started")
 
     try:
         finder = NewShipmentFinder()
-        finder.find_new_records()
+        finder.read_and_find_files()
+        # finder.find_new_records()
 
     except FileNotFoundError as e:
         logging.error(e)

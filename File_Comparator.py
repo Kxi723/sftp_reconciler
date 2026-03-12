@@ -81,7 +81,7 @@ def read_file_list(dir_path: Path):
     # Return ship_ref in list() format
     try:
         with open(file_path, 'r', encoding='utf-8') as ship_ref:
-
+            
             # Get file modification timestamp and convert to Datetime object
             timestamp = os.path.getmtime(file_path)
             datestamp = datetime.datetime.fromtimestamp(timestamp)
