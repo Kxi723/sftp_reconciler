@@ -47,8 +47,8 @@ class NewShipmentFinder:
         excel_lists = list(self.dir_path.glob("*.xlsx"))
 
         # Nothing inside the directory
-        if not csv_lists and excel_lists:
-            raise FileNotFoundError("Didn't found any .csv & .xlsx files")
+        if not csv_lists and not excel_lists:
+            raise FileNotFoundError("Didn't find any .csv or .xlsx files")
         
         # Prioritise for .csv files
         elif csv_lists: 
@@ -111,7 +111,11 @@ class NewShipmentFinder:
         logging.info(f"Loading file: {Path(file_path).name}")
 
         try:
-            df = pd.read_csv(file_path, usecols=[self.ship_ref_col, self.pod_col])
+            df = pd.read_csv(
+                file_path, 
+                usecols=[self.ship_ref_col, self.pod_col],
+                dtype={self.ship_ref_col: str}
+            )
 
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {Path(file_path).name}")
@@ -159,7 +163,12 @@ class NewShipmentFinder:
         else:
             added_mask = ~new_df[self.ship_ref_col].isin(old_df[self.ship_ref_col])
             added_df = new_df[added_mask].copy()
-            logging.info("New ship ref added have been found.")
+
+            if added_df.empty:
+                logging.info("No new ship ref found compared to old file.")
+
+            else:
+                logging.info("New ship ref added have been found.")
         
         logging.debug("Process C ended")
 
