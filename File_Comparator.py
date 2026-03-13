@@ -21,30 +21,14 @@ Directories:
     - Log/     : Directory for the log (.log)
 """
 
-import datetime
 import logging
 import os
 from pathlib import Path
+from datetime import datetime
+from config import setup_logging, CURRENT_DATE_TIME, CSV_DIR, SFTP_DIR, RESULT_DIR, ERROR_DIR
 
-# Paths
-SCRIPT_DIR = Path(__file__).parent
-EXCEL_DIR = SCRIPT_DIR / "ShouldUpload"
-SFTP_DIR = SCRIPT_DIR / "ExistInSFTP"
-RESULT_DIR = SCRIPT_DIR / "MissUpload"
-ERROR_DIR = SCRIPT_DIR / "Error"
-LOG_DIR = SCRIPT_DIR / "Log"
-
-# Get current date & time
-DATE_TIME = datetime.datetime.now()
-CURRENT_DATE_TIME = DATE_TIME.strftime("%d%m%Y_%H%M%S")
-
-# Logging
-logging.basicConfig(
-    filename = LOG_DIR / f"{CURRENT_DATE_TIME}.log",
-    level = logging.DEBUG,
-    format = '%(asctime)s %(levelname)s: %(message)s',
-    filemode = 'w'
-)
+# Initialize shared logging
+setup_logging()
 
 # =============================================================================
 # Functions
@@ -84,7 +68,7 @@ def read_file_list(dir_path: Path):
             
             # Get file modification timestamp and convert to Datetime object
             timestamp = os.path.getmtime(file_path)
-            datestamp = datetime.datetime.fromtimestamp(timestamp)
+            datestamp = datetime.fromtimestamp(timestamp)
 
             logging.debug(f"File readed: {file_path.name} | Last modified date: {datestamp}")
 
@@ -119,8 +103,6 @@ class FileComparator:
         # Ensure output directory exists before starting
         self.result_path = RESULT_DIR
         self.error_path = ERROR_DIR
-        self.result_path.mkdir(parents=True, exist_ok=True)
-        self.error_path.mkdir(parents=True, exist_ok=True)
 
 
     def clean_directory_path(self):
@@ -219,7 +201,7 @@ if __name__ == "__main__":
 
     try:
         # Read data from .txt files
-        excel_list = read_file_list(EXCEL_DIR)
+        excel_list = read_file_list(CSV_DIR)
         sftp_list = read_file_list(SFTP_DIR)
         
         # Initialize and run the comparator

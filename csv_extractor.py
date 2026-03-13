@@ -1,32 +1,15 @@
-from dotenv import load_dotenv
-import os
 from pathlib import Path
 import logging
 import pandas as pd
-from datetime import date, datetime
+from datetime import datetime
+import os
+from config import setup_logging, DATE_TIME, DATE, NEW_FILE, OLD_FILE, CSV_DIR
 
-# Load environment variables from .env file
-load_dotenv()
+setup_logging()
 
-DATE_TIME = datetime.now()
-CURRENT_DATE_TIME = DATE_TIME.strftime("%d%m%Y_%H%M%S")
-
-# Logging
-logging.basicConfig(
-    filename = f"{CURRENT_DATE_TIME}.log",
-    level = logging.DEBUG,
-    format = '%(asctime)s %(levelname)s: %(message)s',
-    filemode = 'w'
-)
-
-# -------------------------------------------------
-# Configuration Constants
-# -------------------------------------------------
-
-NEW_FILE = os.getenv("THE_LATEST_CSV_FILE_PATH")
-OLD_FILE = os.getenv("THE_SECOND_LATEST_CSV_FILE_PATH")
-CSV_DIR = Path(os.getenv("CSV_FOLDER")) if os.getenv("CSV_FOLDER") else None
-
+# =============================================================================
+# Functions
+# =============================================================================
 
 class NewShipmentFinder:
     """
@@ -141,7 +124,7 @@ class NewShipmentFinder:
         df[self.pod_col] = pd.to_datetime(df[self.pod_col], errors="coerce")
 
         # Get date range
-        today_date = pd.Timestamp(date.today()) if not self.demo_mode else pd.Timestamp("2026-03-11")
+        today_date = pd.Timestamp(DATE) if not self.demo_mode else pd.Timestamp("2026-03-11")
         start_date = today_date - pd.Timedelta(days=self.days_lookback)
 
         # Apply date filter, data needed will be store as True value
@@ -200,8 +183,7 @@ class NewShipmentFinder:
         create a new .txt file. This reduce duplicate files created.
         """
 
-        current_time = datetime.now()
-        date_str = current_time.strftime("%d%m%Y")
+        date_str = DATE_TIME.strftime("%d%m%Y")
         
         output_file_name = f"{date_str}.txt"
         output_path = self.dir_path / output_file_name
@@ -222,11 +204,12 @@ class NewShipmentFinder:
                     # Read past data, single column with no header
                     past_df = pd.read_csv(latest_txt, header=None, dtype=str)
                     past_list = past_df[0].tolist()
+
                     current_list = new_data[self.ship_ref_col].astype(str).tolist()
 
                     if past_list == current_list:
-                        logging.warning(f"Data same as latest file {latest_txt.name}.")
-                        print(f"Data matches the latest file: {latest_txt.name}. No new file created.")
+                        logging.warning(f"Result same as latest file: {latest_txt.name}, no file created.")
+                        print(f"Data matches the latest file: {latest_txt.name}, no file created.")
                         return
 
                 except pd.errors.EmptyDataError as e:
@@ -244,7 +227,7 @@ class NewShipmentFinder:
         """
         Display new Ship Ref added from older data.
         """
-        print(f"Today's date: {date.today()}")
+        print(f"Today's date: {DATE}")
 
         if new_data.empty:
             raise SystemExit("No new ship ref is added.")
@@ -266,7 +249,8 @@ class NewShipmentFinder:
 
 
 if __name__ == "__main__":
-    logging.info("Program started")
+
+    logging.info("csv_extractor.py program started")
 
     try:
         finder = NewShipmentFinder()
@@ -281,5 +265,5 @@ if __name__ == "__main__":
 
     except Exception as e:
         logging.error(e)
-        
-    logging.info("Program Ended")
+ 
+    logging.info("csv_extractor.py program ended")
