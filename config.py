@@ -15,16 +15,18 @@ CURRENT_DATE_TIME = DATE_TIME.strftime("%d%m%Y_%H%M%S")
 SCRIPT_DIR = Path(__file__).parent
 
 # Local Directory Paths
-CSV_DIR = SCRIPT_DIR / "Evisibility_Folder"
-SFTP_DIR = SCRIPT_DIR / "ExistInSFTP"
-RESULT_DIR = SCRIPT_DIR / "MissUpload"
+CSV_DIR = SCRIPT_DIR / "evisibility_folder"
+SFTP_DIR = SCRIPT_DIR / "sftp"
+RESULT_DIR = SCRIPT_DIR / "missing"
+SURPLUS_DIR = SCRIPT_DIR / "in_advance"
+
+# Ensure Log directory exists
+RESULT_DIR.mkdir(parents=True, exist_ok=True)
+SURPLUS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Environment paths
 NEW_FILE = os.getenv("THE_LATEST_CSV_FILE_PATH")
 OLD_FILE = os.getenv("THE_SECOND_LATEST_CSV_FILE_PATH")
-
-# Ensure Log directory exists
-RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Shared Logging Setup
 def setup_logging():
@@ -34,5 +36,5 @@ def setup_logging():
         filename=log_file_path,
         level=logging.DEBUG,
         format='%(asctime)s %(levelname)s: %(message)s',
-        filemode='w'
+        filemode='a'
     )
