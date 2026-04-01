@@ -149,18 +149,14 @@ class NewShipmentFinder:
         # If old file is missing or empty, everything is considered "new added"
         if old_df.empty:
             added_df = new_df.copy()
-            logging.warning("All data in past 30days are new added")
+            logging.info("All data in past 60days are new added")
 
         # '~' means NOT, all data not in old_df means new data
         else:
             added_mask = ~new_df[self.ship_ref_col].isin(old_df[self.ship_ref_col])
             added_df = new_df[added_mask].copy()
 
-            if added_df.empty:
-                logging.info("No new ship_ref added")
-
-            else:
-                logging.info(f"Found {len(added_df)} new ship_ref added")
+            logging.info(f"Found {len(added_df)} data added")
 
         added_df.index.name = "new_index"
 
@@ -170,8 +166,8 @@ class NewShipmentFinder:
             ascending=[False, True]
         ).reset_index(drop=True)
 
-        self.display_result_in_terminal(added_df)
         self.write_result_in_txt(added_df)
+        self.display_result_in_terminal(added_df)
 
 
     def write_result_in_txt(self, new_data: pd.DataFrame):
@@ -218,9 +214,15 @@ class NewShipmentFinder:
                 except Exception as e:
                     logging.warning(f"Could not read {latest_txt.name} | {e}")
 
+            # Create empty file to record no new data updated
+            if new_data.empty:
+                output_path.touch()
+                logging.info(f"No new data updated, created empty file {output_path.name}")
+                
             # Save as text format without index and header
-            new_data[self.ship_ref_col].to_csv(output_path, index=False, header=False)
-            logging.info(f"Exported result to {output_path.name}")
+            else:
+                new_data[self.ship_ref_col].to_csv(output_path, index=False, header=False)
+                logging.info(f"Exported result to {output_path.name}")
 
 
     def display_result_in_terminal(self, new_data: pd.DataFrame):
@@ -230,7 +232,8 @@ class NewShipmentFinder:
         print(f"Today's date: {DATE}")
 
         if new_data.empty:
-            raise SystemExit("No new ship ref is added.")
+            print("No new ship ref is added.")
+            return
 
         # Formatting output
         print("-" * 33)
