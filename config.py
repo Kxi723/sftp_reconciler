@@ -24,10 +24,6 @@ SURPLUS_DIR = SCRIPT_DIR / "in_advance"
 RESULT_DIR.mkdir(parents=True, exist_ok=True)
 SURPLUS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Environment paths
-NEW_FILE = os.getenv("THE_LATEST_CSV_FILE_PATH")
-OLD_FILE = os.getenv("THE_SECOND_LATEST_CSV_FILE_PATH")
-
 # Shared Logging Setup
 def setup_logging():
     log_file_path = SCRIPT_DIR / "activity.log"

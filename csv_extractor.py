@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 import os
-from config import setup_logging, DATE_TIME, DATE, NEW_FILE, OLD_FILE, CSV_DIR
+from config import setup_logging, DATE_TIME, DATE, CSV_DIR
 
 setup_logging()
 
@@ -17,19 +17,17 @@ class NewShipmentFinder:
     """
 
     # If no files found, use default file for presentation
-    def __init__(self, first_file: str = NEW_FILE, second_file: str = OLD_FILE,
-                days_lookback: int = 60, dir_path: Path = CSV_DIR):
+    def __init__(self, days_lookback: int = 60, dir_path: Path = CSV_DIR):
 
-        self.first_file = first_file
-        self.second_file = second_file
+        self.first_file = ''
+        self.second_file = ''
         self.days_lookback = days_lookback
         self.dir_path = dir_path
-        self.demo_mode = False
         self.ship_ref_col = "Ship Ref"
         self.pod_col = "POD"
 
 
-    def read_and_find_files(self) -> None :
+    def read_and_find_files(self) -> None:
         """
         Read all CSV & Excel files in directory provided, compare two
         latest files for finding new data updated. If less than two
@@ -79,9 +77,7 @@ class NewShipmentFinder:
                 files_dict.setdefault(file, datestamp)
 
             if len(files_dict) < 2:
-                logging.info(f"{len(files_dict)} valid .csv file is insufficient for further action")
-                logging.info("The system will utilise designated file for demo")
-                self.demo_mode = True
+                raise SystemExit(f"{len(files_dict)} valid .csv file is insufficient for further action")
 
             else:
                 logging.debug(f"{len(files_dict)} .csv files validated")
@@ -126,7 +122,7 @@ class NewShipmentFinder:
         df[self.pod_col] = pd.to_datetime(df[self.pod_col], errors="coerce")
 
         # Get date range
-        today_date = pd.Timestamp(DATE) if not self.demo_mode else pd.Timestamp("2026-03-11")
+        today_date = pd.Timestamp(DATE)
         start_date = today_date - pd.Timedelta(days=self.days_lookback)
 
         # Apply date filter, data needed will be store as True value
@@ -187,8 +183,9 @@ class NewShipmentFinder:
         """
 
         date_str = DATE_TIME.strftime("%d%m%Y")
+        period = "_AM" if DATE_TIME.hour < 12 else "_PM"
         
-        output_file_name = f"{date_str}.txt"
+        output_file_name = f"{date_str}{period}.txt"
         output_path = self.dir_path / output_file_name
 
         # Ensure not creating same .txt file
@@ -264,12 +261,15 @@ if __name__ == "__main__":
 
     except FileNotFoundError as e:
         logging.error(e)
+        print(e)
 
     except SystemExit as e:
         logging.error(e)
+        print(e)
 
     except Exception as e:
         logging.error(e)
+        print(e)
  
     finally:
         logging.info("csv_extractor.py program ended")
