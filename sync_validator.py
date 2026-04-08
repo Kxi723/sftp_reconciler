@@ -38,6 +38,7 @@ class FileComparator:
         self.surplus_dir = surplus_dir
         self.result_list = []
         self.insequence_list = [] # Store data that havent upload at csv but in sftp
+        self.latest_sftp_file = None  # Track latest SFTP file for post-processing rename
 
 
     def read_latest_txt(self, dir_path: Path, sftp: bool = False) -> list:
@@ -93,6 +94,16 @@ class FileComparator:
 
         # For sftp, get new data upload
         else:
+            # Check if latest SFTP file was already processed (has HHMMSS suffix)
+            latest_stem = files_sorted[0][0].stem
+            parts = latest_stem.split("_", 1)
+            if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) == 6:
+                raise SystemExit(
+                    f"SFTP file '{files_sorted[0][0].name}' has already been processed.\n"
+                    "Please add a new SFTP snapshot before running again."
+                )
+            self.latest_sftp_file = files_sorted[0][0]
+
             logging.info(f"Second {file_type} file found: {files_sorted[1][0].name}")
 
             try:
@@ -173,6 +184,32 @@ class FileComparator:
             return []
 
 
+    def mark_sftp_processed(self):
+        """
+        Rename the latest SFTP file with a full timestamp (HHMMSS)
+        to mark it as processed, preventing repeated consumption
+        of the same SFTP data.
+
+        e.g. 07042026_AM.txt → 07042026_145856.txt
+        """
+
+        if not self.latest_sftp_file or not self.latest_sftp_file.exists():
+            return
+
+        date_part = self.latest_sftp_file.stem.split("_")[0]
+        time_part = CURRENT_DATE_TIME.split("_")[1]
+        new_name = f"{date_part}_{time_part}.txt"
+        new_path = self.latest_sftp_file.parent / new_name
+
+        if new_path.exists():
+            logging.warning(f"Cannot rename: {new_name} already exists")
+            return
+
+        self.latest_sftp_file.rename(new_path)
+        logging.info(f"SFTP file processed: {self.latest_sftp_file.name} → {new_name}")
+        print(f"SFTP file renamed: {self.latest_sftp_file.name} → {new_name}")
+
+
     # def carry_forward_missing(self, sftp_set: set) -> list:
     #     """
     #     Return Ship_Ref from the previous result file that are still 
@@ -224,45 +261,39 @@ class FileComparator:
 
         # New data uploaded in SFTP
         sftp_data = self.read_latest_txt(self.sftp_dir, True)
-        print("new SFTP upload: ", sftp_data)
 
         # Data that uploaded in SFTP but not recorded in csv
         pre_upload = self.read_last_record(self.surplus_dir, "surplus")
-        print("Pre-load: ", pre_upload)
         sftp_combined = list(dict.fromkeys(list(pre_upload) + list(sftp_data)))
         sftp_set = set(sftp_combined)
-        print("Total SFTP: ", sftp_combined, "\n")
 
 
         # New data updated in csv
         csv_data = self.read_latest_txt(self.csv_dir, False)
-        print("new csv upload: ", csv_data)
         # Last missing data, check again
         last_missing_sftp = self.read_last_record(self.result_dir, "result")
-        print("last miss: ", last_missing_sftp)
         # Use dictionary to remove duplicates (key is unique), then convert to list
         csv_combined = list(dict.fromkeys(list(csv_data) + list(last_missing_sftp)))
         # Separate set ONLY for O(1) lookup — doesn't need order
         csv_set = set(csv_combined)
-        print("Total CSV: ", csv_combined, "\n")
 
         # Files haven't been upload to SFTP
         file_missing = [f for f in csv_combined if f not in sftp_set]
         self.result_list = list(dict.fromkeys(file_missing))
-        print("Miss: ", self.result_list, "\n")
 
         # Files hasnt recorded in csv
         wait_update = [f for f in sftp_combined if f not in csv_set]
         self.insequence_list = list(dict.fromkeys(wait_update))
-        print("More: ", self.insequence_list, "\n")
-
         logging.info(f"{len(self.result_list)} files haven't upload to SFTP")
         logging.info(f"{len(self.insequence_list)} file hasn't updated in csv")
 
-        # self.display_result_in_terminal()
+        self.display_result_in_terminal()
 
         self.export_result(self.result_list, self.result_dir, "Results")
         self.export_result(self.insequence_list, self.surplus_dir, "Pre-uploads")
+
+        # Lock: rename SFTP file to prevent reprocessing same data
+        self.mark_sftp_processed()
         
 
     def export_result(self, output_data: list, path: Path, title: str = ""):
