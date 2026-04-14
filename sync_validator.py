@@ -39,6 +39,7 @@ class FileComparator:
         self.result_list = []
         self.insequence_list = [] # Store data that havent upload at csv but in sftp
         self.latest_sftp_file = None  # Track latest SFTP file for post-processing rename
+        self.latest_csv_file = None  # Track latest csv file for post-processing rename
 
 
     def filter_parent_path(self, file_path: list) -> list:
@@ -115,10 +116,22 @@ class FileComparator:
 
         logging.info(f"Latest {file_type} file is: {files_sorted[0][0].name}")
 
+        # Clear parent path & its extension
+        file_name = files_sorted[0][0].stem
+
+        # Extract to date & time
+        date_n_time = file_name.split("_", 1)
+
         # For csv, return one list
         if not sftp:
+            if len(date_n_time) == 2 and date_n_time[1].isdigit() and len(date_n_time[1]) == 6:
+                logging.info(f"Latest {file_type} has already been processed")
+                return []
+
             try:
                 with open(files_sorted[0][0], 'r', encoding='utf-8') as data:
+                    self.latest_csv_file = files_sorted[0][0]
+
                     # Remove '\n' in list()
                     return data.read().splitlines()
                 
@@ -127,12 +140,6 @@ class FileComparator:
 
         # For sftp, get new data upload
         else:
-            # Clear parent path & its extension
-            file_name = files_sorted[0][0].stem
-
-            # Extract to date & time
-            date_n_time = file_name.split("_", 1)
-
             # If the file is renamed properly, its processed
             if len(date_n_time) == 2 and date_n_time[1].isdigit() and len(date_n_time[1]) == 6:
                 raise SystemExit(f"Latest {file_type} has already been processed")
@@ -245,7 +252,7 @@ class FileComparator:
         print(f"{title} data saved at {CURRENT_DATE_TIME}.txt")
 
 
-    def mark_sftp_processed(self):
+    def mark_files_processed(self):
         """
         Rename the latest SFTP file with a full timestamp (HHMMSS)
         to mark it as processed, preventing repeated consumption
@@ -255,16 +262,22 @@ class FileComparator:
         if not self.latest_sftp_file or not self.latest_sftp_file.exists():
             return
 
-        timestamp = f"{CURRENT_DATE_TIME}.txt"
-        new_path = self.latest_sftp_file.parent / timestamp
+        if not self.latest_csv_file or not self.latest_csv_file.exists():
+            return
 
-        if new_path.exists():
+        timestamp = f"{CURRENT_DATE_TIME}.txt"
+        new_path_s = self.latest_sftp_file.parent / timestamp
+        new_path_c = self.latest_csv_file.parent / timestamp
+
+        if new_path_s.exists() or new_path_c.exists():
             logging.warning(f"Cannot rename: {timestamp} already exists")
             return
 
-        self.latest_sftp_file.rename(new_path)
+        self.latest_sftp_file.rename(new_path_s)
+        self.latest_csv_file.rename(new_path_c)
         logging.info(f"SFTP file rename as: {timestamp}")
         print(f"SFTP file renamed: {self.latest_sftp_file.name} -> {timestamp}")
+        print(f"CSV file renamed: {self.latest_csv_file.name} -> {timestamp}")
 
 
     def start(self):
@@ -314,7 +327,7 @@ class FileComparator:
         self.display_result_in_terminal()
 
         # Lock: rename SFTP file to prevent reprocessing same data
-        self.mark_sftp_processed()
+        self.mark_files_processed()
 
 
 # -------------------------------------------------
